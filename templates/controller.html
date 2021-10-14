@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>: : 차단기 리모컨: :</title>
+    <meta name="description" content="" />
+    <meta name="keywords" content="" />
+    <meta name="author" content="Tony Lee" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+
+    <link rel="stylesheet" href="assets/static/css/nomalize.css" />
+    <link rel="stylesheet" href="assets/static/css/main.css" />
+    <link rel="stylesheet" href="assets/static/css/web_socket.css" />
+</head>
+
+<style>
+    @keyframes blink-effect {
+        50% {
+            opacity: 0;
+        }
+    }
+
+    .blink span{
+        animation: blink-effect 1s step-end infinite;
+    }
+
+    .title_tag {
+        font-size: 18px;
+        margin-left: 7%;
+    }
+
+</style>
+
+<title>G T Controller</title>
+<body>
+        <div class="login_img" style="text-align: center; ">
+            <img src="assets/static/img/BrandMark_top.png" style="max-width: 70%; margin-top: 10%; height: auto; ">
+        </div>
+            <a href="/"><img src="assets/static/img/logout_02.png" style="width: auto; height: 50px; position:fixed; right:4%; top:12px; "></a>
+        <div id="controller_area" style="text-align: center; margin-top: 3%; "></div>
+        <div id="controller_footer" style="text-align: center; display:none; ">
+        </div>
+<hr style="border: 0px; height: 1px; background-color: #d3d3d3; width: 86.5%; ">
+
+
+        <div name=controller style="width: 100%;">
+    <div style="width:100%; text-align:left;">
+        <div class="title_tag" style="float: left;"> 입출차 정보 - <input readonly style="width: 50%; font-weight: bold; font-size: 20px; border: none; text-align: left; " type="text" id= "name_tag" value=""></div>
+    </div>
+
+    <div style="margin: 3px 0 3px 0;">
+        <table style="margin: 0 auto; width: 88%;">
+            <tr>
+                <td id="img_size_controller" style="width: 100%; height: 230px; text-align: center; "><img id="carPicOfBase64" src="assets/static/img/부장님차량.jpg" style="width: 100%; height: 220px; border-radius: 5px;"></td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="width:87%; text-align:center; margin: 0 auto;">
+        <input readonly style="width: 100%; height: 50px; margin-bottom: 1.5%; font-size: 18px; text-align: center; border-radius: 5px; border: 1px solid #d3d3d3;" type="text" id="status" value=""><br>
+    </div>
+
+    <hr style="border: 0px; height: 1px; background-color: #d3d3d3; width: 86.5%; ">
+        <div class="title_tag"> 차단기 제어</div>
+
+    <div style="text-align: center; margin: 0 0 0 0;">
+        <input class="button_class" style="width: 42%; height: 60px; margin:1%; font-size: large; background-color:#dae3f4; border-radius:5px; color: white;"  type="button" id="gp_open" onclick="gp_open(this.name);" name="" value="열림">
+        <input class="button_class" style="width: 42%; height: 60px; margin:1%; font-size: large; background-color:#dae3f4; border-radius:5px; color: white;"  type="button" id="gp_close" onclick="javascript:gp_close(this.name);" name="" value="닫힘">
+    </div>
+    <div style="text-align: center; margin: 0 0 0 0;">
+        <input class="button_class" style="width: 42%; height: 60px; margin:1%; font-size: large; background-color:#dae3f4; border-radius:5px; color: white;"  type="button" id="gp_ulock" onclick="javascript:gp_ulock(this.name);" name="" value="열림고정설정">
+        <input class="button_class" style="width: 42%; height: 60px; margin:1%; font-size: large; background-color:#dae3f4; border-radius:5px; color: white;"  type="button" id="gp_nlock" onclick="javascript:gp_nlock(this.name);" name="" value="열림고정해제">
+    </div>
+</div>
+
+<script>
+    let is_car_in = true;
+    let interval = [];
+    let change_color = "#FFA6C5";
+    let default_img = "assets/static/img/test_top_back.png"
+    let area_button_color = "black"; //색상 변경 요망
+    let controller_button_color = "#d2d2d2";
+    let width_percent ="86.5";
+    let src = document.getElementById("carPicOfBase64");
+    let ok = "";
+    let name_set = {};
+    let controller_area_set = [];
+    let controller_area_with_controller =[]; // 정문 후문과 그 해당 컨트롤러가 다 들어있는 객체
+    let head = "{{head}}";
+    let addr = "{{addr}}";
+    let controller_count;
+    let name_tag = document.getElementById("name_tag");
+    let status = document.getElementById("status");
+    let controller_buttons = document.getElementsByClassName("controller_button");
+    let controller_area_buttons = document.getElementsByClassName("controller_area_button");
+    let _gp_open = document.getElementById("gp_open");
+    let _gp_close = document.getElementById("gp_close");
+    let _gp_ulock = document.getElementById("gp_ulock");
+    let _gp_nlock = document.getElementById("gp_nlock");
+    let controll_area = document.getElementById("controller_area");
+    let websocket;
+    const wsUri = head + "://" + addr + "/";
+
+    // console.log(wsUri)
+
+    window.onload = function () {
+        let controller = document.getElementsByClassName("button_class");
+        for(let i=0; i < controller.length; i++){
+            controller[i].disabled = "disabled";
+        }
+    }
+
+    function check_area_button_then_change_color(){
+        // console.log(controller_area_with_controller[0]);
+        // console.log(controller_area_with_controller[1]);
+        controller_area_with_controller
+            .forEach(function(full_data, index){
+                // console.log("data_is_car_in" + full_data.is_car_in);
+                if(full_data.is_car_in){
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.color = "red";
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="blink-effect 0.5s step-end infinite";
+                }else{
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.color = area_button_color;
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="";
+                }
+        })
+    }
+
+    function change_area_button_blue(index){
+        controller_area_buttons[index].getElementsByTagName("span")[0].style.color = "blue";
+        controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="";
+    }
+
+    function check_controller_button_then_change_color(controller_button){
+        let location_number = controller_button.name;
+        controller_area_with_controller.forEach( full_data =>
+            full_data.info.forEach(function(info, index){
+                if(info.controller_location_number == controller_button.name){
+                        if(info.vehicle_number){
+                            controller_button.style.color = "red";
+                        }else{
+
+                        }
+                }
+        }))
+
+
+    }
+
+    function unlockcontroller_gate(location_number) {
+        let newVar = {
+            location_number: location_number,
+            need_to_unlock: true
+        };
+        let unlock_controller_gate = newVar;
+        return unlock_controller_gate
+        //리턴 타입으로 status: unlock 과 location_number 을 준다. 그리고
+        //Area 버튼 색상 부여 체크 function 에서 이 함수를 가져와 항상 체크한다.
+
+    }
+
+    function controller_lock(location_number){
+        controller_area_with_controller.forEach( full_data => full_data.info.forEach(function(info){
+            if(info.controller_location_number == location_number ){
+                info.is_unlocked = false;
+            }
+        }))
+    }
+
+    function controller_unlock(location_number) {
+        controller_area_with_controller.forEach( full_data =>
+            full_data.info.forEach(function(info, index){
+                if(info.controller_location_number == location_number){
+                    info.is_unlocked = true;
+                }
+            }))
+    }
+
+    function default_color_for_controller_area_buttons() {
+        for(let i=0; i < controller_area_buttons.length; i++){
+        controller_area_buttons[i].style.backgroundColor = "white";
+         }
+    }
+
+    function vehicle_check_and_setting_car_in(selected_full_data) {
+        let result = false;
+        selected_full_data.info.forEach(function(info){
+            if(info.vehicle_number){
+                selected_full_data.is_car_in = true;
+                result = true;
+            }else{
+                // console.log("차량없음");
+            }
+        })
+        return result
+    }
+
+    function before_clicked_area_button_check(click_name){
+        let result = "";
+        controller_area_with_controller.forEach(
+            function(full_info, index){
+                if(full_info.area_name == click_name ){
+                    result = vehicle_check_and_setting_car_in(full_info);
+                    if(result==true){
+                        controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="blink-effect 0.5s step-end infinite";
+                        controller_area_buttons[index].getElementsByTagName("span")[0].style.color ="red";
+                    }else{
+                        controller_area_buttons[index].getElementsByTagName("span")[0].style.color = area_button_color;
+                        controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="";
+                    }
+                }
+        })
+    }
+    function click_area_button_then_check(controller_area){
+        let result ="";
+        controller_area_with_controller.forEach(function(area, index){
+            if(area.area_name == controller_area){
+                result = vehicle_check_and_setting_car_in(area);
+                if(result==true){
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.color = "red";
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="";
+                }else{
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.color = area_button_color;
+                    controller_area_buttons[index].getElementsByTagName("span")[0].style.animation ="";
+                }
+            }
+        })
+    }
+
+
+
+    function init() {
+        testWebSocket();
+    }
+
+    window.addEventListener("load", init, false);
+
+
+    function testWebSocket()
+    {
+        websocket = new WebSocket(wsUri);
+        status.value = "연결 중..";
+        websocket.onopen = function(evt) { onOpen(evt) };
+        websocket.onclose = function(evt) { onClose(evt) };
+        websocket.onmessage = function(evt) { onMessage(evt) };
+        websocket.onerror = function(evt) { onError(evt) };
+    }
+
+    function onOpen(evt)
+    {
+        // console.log("onOpen:"+ evt.data);  정보 뒤에 - 넣기
+        status.value = "연결";
+        for( let i in document.getElementsByClassName("button_class")){
+            document.getElementsByClassName("button_class")[i].disabled = false;
+            document.getElementsByClassName("button_class")[i].style.color = "black";
+            document.getElementsByClassName("button_class")[i].style.border = "0";
+        }
+    }
+
+    function onClose(evt)
+    {
+        // console.log("onClose:"+ evt.data)
+        status.value = "접속끊김";
+    }
+
+    function onError(evt)
+    {
+        // console.log("onError:" + evt.data)
+        status.value = "에러접속불가";
+
+    }
+    function onMessage(evt) {
+        //stp045
+        console.log("onMessage:" + evt.data.substring(0, 30));
+        if (evt.data.startsWith("stp")) {
+            //stp0251정문입차&52정문출차&53후문입차&후문출차
+            controller_count = parseInt(evt.data.substring(3, 5));
+            // console.log("차단기 갯수:" + controller_count)
+
+            let info = evt.data.substring(5,);
+            let strings = info.split('&');
+            let controller_area = [];
+            for (let i = 0; i < strings.length; i++) {
+                //차단기 위치 이름 ex)51정문입차, 52후문출차 앞뒤 2개씩 자르기.
+                controller_area.push(strings[i].substring(2, strings[i].length - 2)); //ex)정문입차 -> 정문, 뒤에 '입차' 글자 자르기.
+                name_set[i] = {
+                    area_name: strings[i].substring(2, strings[i].length - 2),
+                    controller_location_number: strings[i].substring(0, 2),
+                    f_name: strings[i].substring(2,),
+                    vehicle_number: "",
+                    carPicOfBase64: "",
+                    is_unlocked:false
+                }
+            }
+            controller_area_set = Array.from(new Set(controller_area));
+
+            for(let i=0; i < controller_area_set.length; i++){
+                controller_area_with_controller[i] = {
+                    is_car_in:false,
+                    area_name:controller_area_set[i],
+                    info: [],
+                }
+            }// ex) 정문과 후문 각 각의 이름으로 area_set 을 만들고 그 안에 정문과 후문에 해당하는 controller 을 부가한다.
+
+            for(let i=0; i < controller_area_set.length; i++) {
+                for (let t = 0; t < controller_count; t++) {
+                    if (name_set[t].area_name == controller_area_with_controller[i].area_name) {
+                                    controller_area_with_controller[i].info.push(name_set[t]);
+                            }
+                        }
+                    }
+            // 부가하는 작업.
+
+          let width = width_percent/controller_area_with_controller.length;
+            //
+            controll_area.innerHTML = "";
+            for (let i = 0; i < controller_area_with_controller.length; i++) {
+                let _controller_area = document.createElement("button");
+                let span = document.createElement("span");
+                span.innerHTML = controller_area_set[i];
+                _controller_area.append(span);
+                _controller_area.name =  controller_area_set[i];
+                _controller_area.setAttribute("class", "controller_area_button");
+                _controller_area.style.width = width + "%";
+                _controller_area.style.height = "50px";
+                _controller_area.style.margin = "0 0 0 0";
+                _controller_area.style.border = "1px solid #d3d3d3";
+                if(i%2==0){
+                    _controller_area.style.borderRight = "none";
+                }
+
+                _controller_area.style.backgroundColor = "white";
+                _controller_area.style.color = area_button_color;
+                _controller_area.style.fontSize = "18px";
+                // _controller_area.style.boxShadow = "1px 1px 3px 1px #dadce0 inset";
+                controll_area.appendChild(_controller_area);
+
+
+                _controller_area.onclick = function () {
+                    check_area_button_then_change_color()
+                    controller_area_with_controller.forEach(function(info, index){
+                        if(controller_area_set[i] == info.area_name){
+                            //차량이 있을 때만 if를 걸면 로직에 들어가는 경우가 줄어든다.
+                            if(info.is_car_in){
+                                click_area_button_then_check(controller_area_set[index]);
+                            }
+                        }
+                    })
+
+                    //클릭 시 드롭다운
+                    let click = document.getElementById("controller_footer");
+
+                    if(click.style.display === "none"){
+                        click.name = controller_area_with_controller[i].area_name;
+                        click.style.display = "block";
+                    }else{
+                        console.log("click.name:" + click.name)
+                        if(click.name == controller_area_with_controller[i].area_name){
+                            click.name = controller_area_with_controller[i].area_name;
+                            click.style.display = "none";
+                            check_area_button_then_change_color();
+                        }else{
+                            click.style.display = "block";
+                            before_clicked_area_button_check(click.name);
+                            click.name = controller_area_with_controller[i].area_name;
+                        }
+                        //버튼을 다시 한번 클릭해서 드롭창을 닫을 때, 버튼을 다시 깜빡이도록 한다.
+                        // click_area_button_then_check(controller_area_with_controller[i])
+                    }
+
+
+                    //0부터 다시 나열시키기.
+                    if (ok == "ok") {
+                        for (let j = controller_buttons.length; j-1 >= 0; j--) {
+                            controller_buttons[0].remove();
+                        }
+                    }
+
+                    // controller_buttons.innerHTML = "";
+                   let width_controller = width_percent/controller_area_with_controller[i].info.length;;
+                   for(let k in controller_area_with_controller[i].info){
+
+                       let infoElement = controller_area_with_controller[i].info[k];
+
+                            let cl = document.createElement("button");
+                            cl.onclick = function () {
+                                check_area_button_then_change_color();
+                                change_area_button_blue(i);
+                                let click = document.getElementById("controller_footer");
+                                if(click.style.display === "none"){
+                                    click.style.display = "block";
+                                }else{
+                                    click.style.display = "none";
+                                }
+                                _gp_open.name =  infoElement.controller_location_number;
+                                _gp_close.name = infoElement.controller_location_number;
+                                _gp_ulock.name = infoElement.controller_location_number;
+                                _gp_nlock.name = infoElement.controller_location_number;
+                                // name_tag.value = infoElement.controller_location_number + "/" + infoElement.f_name;
+                                name_tag.value = infoElement.f_name;
+                                if (infoElement.vehicle_number) {
+                                    src.src = infoElement.carPicOfBase64;
+                                    status.value = infoElement.vehicle_number;
+                                    src.style.width = "100%";
+                                    src.style.height = "220px";
+                                } else {
+                                    src.src = default_img;
+                                    src.style.width = "30%";
+                                    src.style.height = "auto";
+                                    if(infoElement.is_unlocked){
+                                        status.value = "\"열림고정상태\" 입니다.";
+                                    }else{
+                                        status.value = "현재 대기 중인 차량이 없습니다.";
+                                    }
+                                }
+                            }
+                            cl.innerHTML = infoElement.f_name;
+                            cl.name = infoElement.controller_location_number;
+                            cl.setAttribute("class", "controller_button");
+                            cl.style.width = width_controller+"%";
+                            cl.style.height = "50px";
+                            cl.style.margin = "0 0 0 0";
+                            cl.style.border = "1px solid #d3d3d3";
+                            cl.style.borderTop = "none";
+
+                            if(k%2==0){
+                                cl.style.borderRight = "none";
+                            }
+                            cl.style.color = "black";
+                            // cl.style.border = "1px solid #d3d3d3";
+                            // cl.style.backgroundColor = controller_button_color;
+                            // cl.style.backgroundColor = "#DAE3F4";
+                            cl.style.backgroundColor = "#F8F8F8";
+                            cl.value = "";
+                            check_controller_button_then_change_color(cl);
+
+
+
+                            ok = "ok";
+
+                            let test = document.getElementById("controller_footer");
+                            test.appendChild(cl);
+                        }
+                    }
+                }
+
+             _gp_open.name = controller_area_with_controller[0].info[0].controller_location_number;
+            _gp_close.name = controller_area_with_controller[0].info[0].controller_location_number;
+            _gp_nlock.name = controller_area_with_controller[0].info[0].controller_location_number;
+            _gp_ulock.name = controller_area_with_controller[0].info[0].controller_location_number;
+            name_tag.value = controller_area_with_controller[0].info[0].f_name;
+
+
+            //기본 색상 적용하기.
+            default_color_for_controller_area_buttons();
+
+
+        }else if(evt.data.includes("VN")){
+            //52VN대구02가302&사진이미지
+            console.log(evt)
+            let location = evt.data.substring(0, 2);
+            let need_to_be_split = evt.data.substring(4, );
+            let info_of_carNumber_carPic = need_to_be_split.split('&');
+            let _vehicle_number = info_of_carNumber_carPic[0];
+            let carPicOfBase64 = info_of_carNumber_carPic[1];
+                /*
+                if(vehicle_number){
+                다른 객체 생성 후 vehicle_number를 추가한다.
+                 */
+            controller_area_with_controller.forEach( full_data =>
+                full_data.info.forEach(function(info){
+                    if(info.controller_location_number==location){
+                        if(info.is_unlocked){
+                            console.log("열림고정설정, 차량 번호 부여 하지 않음.")
+                        }else{
+                            info.vehicle_number = _vehicle_number;
+                            info.carPicOfBase64 = "data:img/png;base64," + carPicOfBase64;
+                            full_data.is_car_in = true;
+                        }
+                    }
+                }))
+            // console.log("controller_area_with_controller_object:", controller_area_with_controller[0])
+            // console.log("controller_area_with_controller_object:", controller_area_with_controller[1])
+            check_area_button_then_change_color();
+            //
+
+        }else if(evt.data.includes("OP")){
+            let location = evt.data.substring(0, 2);
+            controller_area_with_controller.forEach(full_data =>
+                full_data.info.forEach(function(info){
+                    if(info.controller_location_number == location){
+                        status.value = "열림";
+                        name_tag.value = info.f_name;
+                    }
+                }))
+
+        }else if(evt.data.includes("CL")){
+            let location = evt.data.substring(0, 2);
+            controller_area_with_controller.forEach(full_data =>
+                full_data.info.forEach(function(info, index){
+                    if(info.controller_location_number == location){
+                        status.value = "닫힘";
+                        name_tag.value =  info.f_name;
+                    }
+                }))
+            check_area_button_then_change_color()
+        }else if(evt.data.includes("UL")){
+            let location = evt.data.substring(0, 2);
+                controller_area_with_controller.forEach(full_data =>
+                    full_data.info.forEach(function(info){
+                        if(info.controller_location_number == location){
+                            status.value = "열림고정설정";
+                            name_tag.value =  info.f_name;
+                            info.ve
+                        }
+                    }))
+            check_area_button_then_change_color()
+        }else if(evt.data.includes("NL")){
+            let location = evt.data.substring(0, 2);
+            controller_area_with_controller.forEach(full_data =>
+                full_data.info.forEach(function(info){
+                    if(info.controller_location_number == location){
+                        status.value = "열림고정해제";
+                        name_tag.value =  info.f_name;
+                    }
+                }))
+            check_area_button_then_change_color()
+        }else{
+            let location = evt.data.substring(0, 2);
+            controller_area_with_controller.forEach(full_data =>
+                full_data.info.forEach(function(info){
+                    if(info.controller_location_number == location){
+                        status.value = "접속 불량";
+                        name_tag.value =  info.f_name;
+                    }
+                }))
+        }
+        check_area_button_then_change_color()
+    }
+    function gp_open(controller_location_number)
+    {
+        status.value = "열림 요청 중";
+        let area = "";
+        let s = "";
+        while (s.length == 0 ){
+            s = prompt("사유를 입력해주세요(공백은 안됩니다. ^^)", "");
+            if(s == null){
+                return false;
+            }
+        }
+            controller_area_with_controller.forEach(full_data =>
+                                            full_data.info.forEach(function(info){
+                                                if(info.controller_location_number == controller_location_number){
+                                                        //테스트 요망
+                                                        if(info.vehicle_number){
+                                                            websocket.send(info.controller_location_number + "OP" + s + '&' + info.area_name + '&' + info.vehicle_number);
+                                                            // console.log("차량이 있을 시:"+info.controller_location_number + "OP" + info.area_name + '&' + info.vehicle_number);
+                                                            info.vehicle_number = "";
+                                                            let result = vehicle_check_and_setting_car_in(full_data);
+                                                            // console.log("result:" + result);
+                                                            if(!result){
+                                                                full_data.is_car_in = false;
+                                                            }
+
+                                                            //색상변화
+                                                        }else{
+                                                            websocket.send(info.controller_location_number + "OP" + s + '&' + info.area_name);
+                                                            // console.log("차량없을 시:"+info.controller_location_number + "OP" + info.area_name);
+                                                        }
+                                                        check_area_button_then_change_color()
+
+                                                }
+                                            }))
+    }
+
+    function gp_close(controller_location_number){
+        status.value = "닫힘 요청 중";
+        controller_area_with_controller.forEach(full_data =>
+            full_data.info.forEach(function(info){
+                            if(info.controller_location_number == controller_location_number){
+                                websocket.send(info.controller_location_number + "CL");
+                                // console.log(info.controller_location_number + "CL");
+                            }
+        }))
+    }
+
+    function gp_ulock(controller_location_number){
+        // unlockcontroller_gate(controller_location_number);
+        status.value = "열림고정설정 중";
+        let s = "";
+        while (s.length == 0 ){
+            s = prompt("사유를 입력해주세요(공백은 안됩니다. ^^)", "");
+        }
+        // if unlock 이면
+        // unlock_controller_gate(location_number);
+        controller_area_with_controller.forEach(full_data =>
+            full_data.info.forEach(function(info){
+                if(info.controller_location_number == controller_location_number){
+                    if(info.vehicle_number){
+                        websocket.send(info.controller_location_number + "UL" + s + '&' + info.area_name + '&' + info.vehicle_number);
+                        // console.log("차량이 있을 시:"+info.controller_location_number + "OP" + info.area_name + '&' + info.vehicle_number);
+                        info.vehicle_number = "";
+                        let result = vehicle_check_and_setting_car_in(full_data);
+                        // console.log("result:" + result);
+                        if(!result){
+                            full_data.is_car_in = false;
+                        }
+
+                        //색상변화
+                    }else{
+                        websocket.send(info.controller_location_number + "UP" + s + '&' + info.area_name);
+                        // console.log("차량없을 시:"+info.controller_location_number + "OP" + info.area_name);
+                    }
+                    controller_unlock(controller_location_number);
+                    check_area_button_then_change_color()
+                }
+            }))
+    }
+
+    function gp_nlock(controller_location_number){
+        status.value = "열림고정해제 중";
+        controller_area_with_controller.forEach(full_data =>
+            full_data.info.forEach(function(info){
+                if(info.controller_location_number == controller_location_number){
+                    websocket.send(info.controller_location_number + "NL");
+                    // console.log(info.controller_location_number + "NL");
+                    controller_lock(controller_location_number)
+                }
+            }))
+    }
+
+
+
+</script>
+</body>
+
+</html>

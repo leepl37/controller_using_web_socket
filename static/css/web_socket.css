@@ -1,0 +1,44 @@
+#controller_footer{
+    width :100%;
+    height: 35px;
+    margin: 0 0 0 0;
+    border: 0;
+    color :black;
+    border: none;
+    borderleft : 1px solid gray;
+    backgroundColor : white;
+    position: absolute;
+}
+
+
+.button_class:active {
+    background-color: bisque;
+
+    transform: translateY(4px);
+}
+
+.button_class {
+    cursor: pointer;
+}
+
+.button_class:after {
+}
+.controller_button:active {
+    background-color: bisque;
+    transform: translateY(2px);
+}
+.controller_button {
+    cursor: pointer;
+}
+.controller_area_button:active{
+    background-color: bisque;
+    transform: translateY(2px);
+}
+.controller_area_button {
+    cursor: pointer;
+    height:50px;
+    margin:0 0 0 0;
+    border:1px solid white;
+    /*animation: blink 1.5s ease-in-out infinite alternate;*/
+}
+
